@@ -1,5 +1,126 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>waibibab's blog</title><link>https://waibibab-cs.github.io</link><description>持续学习</description><copyright>waibibab's blog</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://avatars.githubusercontent.com/u/105782835?s=400&amp;u=04c0291bd1e06b01ccad1d53388ed4a8a8894a53&amp;v=4</url><title>avatar</title><link>https://waibibab-cs.github.io</link></image><lastBuildDate>Thu, 11 Dec 2025 04:16:38 +0000</lastBuildDate><managingEditor>waibibab's blog</managingEditor><ttl>60</ttl><webMaster>waibibab's blog</webMaster><item><title>OSTEP37.磁盘驱动器</title><link>https://waibibab-cs.github.io/post/OSTEP37.-ci-pan-qu-dong-qi.html</link><description># 前言
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>waibibab's blog</title><link>https://waibibab-cs.github.io</link><description>持续学习</description><copyright>waibibab's blog</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://avatars.githubusercontent.com/u/105782835?s=400&amp;u=04c0291bd1e06b01ccad1d53388ed4a8a8894a53&amp;v=4</url><title>avatar</title><link>https://waibibab-cs.github.io</link></image><lastBuildDate>Thu, 11 Dec 2025 06:54:30 +0000</lastBuildDate><managingEditor>waibibab's blog</managingEditor><ttl>60</ttl><webMaster>waibibab's blog</webMaster><item><title>CMU15-213 Lab1：DataLab实验记录</title><link>https://waibibab-cs.github.io/post/CMU15-213%20Lab1%EF%BC%9ADataLab-shi-yan-ji-lu.html</link><description># 前言
+将datalab-handout.tar移动到WSL环境中，并解压，该实验的目的便是在bits.c文件中按照特定的规则，解决一系列puzzles
+
+其中，使用btest检测结果的正确性，使用dlc检测是否符合规则（比如是否使用了禁止使用的operator，是否使用了过多的operator，在解决整数puzzles的时候，是否使用了non-straightline code的代码），有关整数的题目，只需要考虑32位整数，有关浮点数的题目，只需要考虑单精度浮点数
+
+我运行的时候出现了如下的问题：
+![image.png](https://raw.githubusercontent.com/waibibab-cs/blog_img/main/cdnimg/20251211144517.png)
+
+这是由于环境没有完善造成的，通过执行以下命令来完善编译环境：
+```bash
+sudo apt-get update 
+sudo apt-get install gcc-multilib libc6-dev-i386
+```
+# puzzles求解
+## bitXor
+根据德摩根定律可知：
+
+$`\begin{align*}
+x \wedge y &amp;= (\neg x \mathbin{\&amp;} y) \mid (x \mathbin{\&amp;} \neg y) \\
+&amp;= \neg \bigl( \neg \bigl( (\neg x \mathbin{\&amp;} y) \mid (x \mathbin{\&amp;} \neg y) \bigr) \bigr) \\
+&amp;= \neg \bigl( \neg (\neg x \mathbin{\&amp;} y) \mathbin{\&amp;} \neg (x \mathbin{\&amp;} \neg y) \bigr)
+\end{align*}`$
+按照要求，编写代码：
+```c
+int bitXor(int x, int y)
+{
+  int left = ~(~x &amp; y);
+  int right = ~(x &amp; ~y);
+  int res = ~(left &amp; right);
+  return res;
+}
+```
+![image.png](https://raw.githubusercontent.com/waibibab-cs/blog_img/main/cdnimg/20251211144553.png)
+
+## tmin
+根据补码公式：![image.png](https://raw.githubusercontent.com/waibibab-cs/blog_img/main/cdnimg/20251211145247.png)
+我们知道，32位补码能表示的最小数是`1000···(共31个0)000`，思路很简单，首先对0进行取反得到`all_one = 1111···(共32个1)111`然后让这个数左移31位即可
+```c
+int tmin(void)
+
+{
+  int all_one = ~0;
+  int res = all_one &lt;&lt; 31;
+  return res;
+}
+```
+![image.png](https://raw.githubusercontent.com/waibibab-cs/blog_img/main/cdnimg/20251211144602.png)
+
+## isTmax
+我们知道，32位补码能表示的最大数是`01111···(共31个1)111`，然后我们发现：Tmax的补码的位表示与Tmax+1相同，也就是：
+$$Tmax + 1 == \neg Tmax$$
+在位运算中如何实现当a和b相同时返回一呢？如下所示
+```c
+return !(a ^ b);
+```
+接下来思考有没有边界情况？发现当x是`111···(共32个1)111`时，同样满足上述性质，因此我们需要把这个情况排除，综上，我们编写如下代码：
+```c
+int isTmax(int x)
+
+{
+  int x_o = ~x;
+  int x_and_one = x + 1;
+  int is_not_all_one = !!(~x);
+  return !(x_o ^ x_and_one) &amp; is_not_all_one;
+}
+```
+![image.png](https://raw.githubusercontent.com/waibibab-cs/blog_img/main/cdnimg/20251211144609.png)
+
+## allOddBits
+很容易想到的一个思路是让x与0xAAAAAAAA做与运算，如果结果等于0xAAAAAAAA就返回一，因此这个问题就转换为了如何构造0xAAAAAAAA，由于datalab最大能够使用的整数常量为0xff，因此我们用0xAA去构造0xAAAAAAAA，综上，我们编写如下代码：
+```c
+int allOddBits(int x)
+{
+  int two_a = 0xAA;
+  int eight_a = (two_a &lt;&lt; 24) + (two_a &lt;&lt; 16) + (two_a &lt;&lt; 8) + two_a; // 0xAAAAAAAA
+  return !(eight_a ^ (eight_a &amp; x));
+}
+```
+![image.png](https://raw.githubusercontent.com/waibibab-cs/blog_img/main/cdnimg/20251211144616.png)
+
+## negate
+刚开始我以为让这个题变一个符号位就行，于是是这样写的：
+```c
+int negate(int x) {
+	int tmin = 1 &lt;&lt; 31;
+	return x ^ tmin;
+}
+```
+但才想起来tmin和0这两个边界没办法处理，想了半天不知道这个边界如何处理？又突然想起来，其实求负数直接用补码定义就行了......取反加一
+```c
+int negate(int x) {
+	return ~x + 1;
+}
+```
+![image.png](https://raw.githubusercontent.com/waibibab-cs/blog_img/main/cdnimg/20251211144622.png)
+
+## isAsciiDigit
+这道题是让我们判断x是否在一个区间范围`[0x30, 0x39]`之内，因此我们可以让x与0x30作差，让0x39与x作差，然后当两个差的符号均为正，则结果返回1
+
+然而，这道题是不允许使用减号的，所以可以改成加上对应的负数，如何求负数呢？我们只需要按照上道题的取反加一的方法即可！
+```c
+int isAsciiDigit(int x)
+{
+  int low = 0x30;
+  int high = 0x39;
+  int diff1 = x + (~low + 1);
+  int diff2 = high + (~x + 1);
+  int sign1 = diff1 &gt;&gt; 31 &amp; 1;
+  int sign2 = diff2 &gt;&gt; 31 &amp; 1;
+  return !(sign1 | sign2);
+}
+```
+![image.png](https://raw.githubusercontent.com/waibibab-cs/blog_img/main/cdnimg/20251211144629.png)
+
+## conditional
+使用位运算模拟条件语句，我们可以使用**掩码mask**
+例如，对于`if (condition) return a; else return b;`
+如果条件为true，我们就令mask为全1的值，如果条件为false，令其为全0的值
+这样的话，最终就返回：`return (mask &amp; a) | (~mask &amp; b)`
+因为当条件为true时，全1的mask与a进行与运算还是a，而~mask为0，与b进行与运算结果为0，因此最终返回a；同理，条件为false时，最终返回false
+
+但是，我们在这个题中如何构造mask呢？可以使用：`~(!!x)+1`，当x不等于0时，也就是条件为true时，`!!x`为1，取反加一就是-1，位表示刚好是全1，当x等于0时，也就是条件为false时，`!!x`为0，取反加一还是0，位表示刚好是全0。</description><guid isPermaLink="true">https://waibibab-cs.github.io/post/CMU15-213%20Lab1%EF%BC%9ADataLab-shi-yan-ji-lu.html</guid><pubDate>Thu, 11 Dec 2025 06:53:58 +0000</pubDate></item><item><title>OSTEP37.磁盘驱动器</title><link>https://waibibab-cs.github.io/post/OSTEP37.-ci-pan-qu-dong-qi.html</link><description># 前言
 本文介绍磁盘驱动器（hard disk drive，HDD）的工作原理、结构、性能分析以及操作系统如何通过磁盘调度来优化性能
 # 磁盘接口与基本几何结构
 **基本接口与存储单元**：现代磁盘驱动器的基本接口简单，将其视为由大量扇区（512 字节块）组成的地址空间，扇区从 0 到 n−1 编号。</description><guid isPermaLink="true">https://waibibab-cs.github.io/post/OSTEP37.-ci-pan-qu-dong-qi.html</guid><pubDate>Thu, 11 Dec 2025 04:12:57 +0000</pubDate></item></channel></rss>
